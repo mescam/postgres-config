@@ -1,2 +1,4 @@
 ---
+config_dir_path: /etc/postgresql/9.5/main
+postgres_config: postgresql.conf
 max_connections: 100

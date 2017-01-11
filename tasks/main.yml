@@ -1,7 +1,11 @@
 ---
 
-- name: Update config
-  template: src=postgresql.conf.j2 dest=/etc/postgresql/9.5/main/postgresql.conf
+- name: Update performance.conf config
+  template: src=performance.conf.j2 dest={{config_dir_path}}/performance.conf
+  register: perfconf
+
+- name: Update postgres config
+  lineinfile: dest={{config_dir_path}}/{{postgres_config}} line='include \'performance.conf\''
   register: pgconf
 
 - debug: msg={{ (ansible_memtotal_mb/1024.0)|round|int }}
@@ -12,4 +16,4 @@
 
 - name: Restart postgresql
   service: name=postgresql state=restarted
-  when: pgconf.changed
+  when: pgconf.changed or pgconf.changed
