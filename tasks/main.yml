@@ -1,19 +1,32 @@
 ---
+- name: Compute optimized config values (#1)
+  set_fact:
+    pg_mem: "{{(ansible_memtotal_mb * 1024)}}"
+
+- name: Compute optimized config values (#2)
+  set_fact:
+    pg_shared_buffers: "{{(pg_mem|int / 4) | round | int}}"
+    pg_effective_cache: "{{((pg_mem|int * 3) / 4) | round | int}}"
+    pg_maintenance_work_mem: "{{[2097152, pg_mem|int / 16] | min | round | int}}"
+
+- name: Compute optimized config values (#3)
+  set_fact:
+    pg_work_mem: "{{(pg_mem|int - pg_shared_buffers|int)/(pg_max_connections|int * 3) | round | int}}"
+
+- debug: msg="{{ ansible_memtotal_mb }}"
+- debug: msg="shared_buffers {{ (pg_shared_buffers|int / 1024) | int}}MB"
+- debug: msg="work_mem  {{ pg_work_mem|int }}kB"
+- debug: msg="maintenance_work_mem  {{ (pg_maintenance_work_mem|int / 1024) | int}}MB"
+- debug: msg="effective_cache_size {{ (pg_effective_cache|int / 1024) | int}}MB"
 
 - name: Update performance.conf config
-  template: src=performance.conf.j2 dest={{config_dir_path}}/performance.conf
+  template: src=performance.conf.j2 dest={{pg_config_dir}}/performance.conf
   register: perfconf
 
 - name: Update postgres config
-  lineinfile: dest={{config_dir_path}}/{{postgres_config}} line='include \'performance.conf\''
+  lineinfile: dest={{pg_config_dir}}/{{pg_config_name}} line='include = \'performance.conf\''
   register: pgconf
-
-- debug: msg={{ (ansible_memtotal_mb/1024.0)|round|int }}
-- debug: msg="shared_buffers {{ (((ansible_memtotal_mb/1024.0)|round|int)*0.25)|int*1024 }}MB"
-- debug: msg="work_mem  {{ ((((ansible_memtotal_mb/1024.0)|round|int)*0.25)/max_connections*1024)|round|int }}MB"
-- debug: msg="maintenance_work_mem  {{ ((ansible_memtotal_mb/1024.0)|round|int)*64 }}MB"
-- debug: msg="effective_cache_size {{ (((ansible_memtotal_mb/1024.0)|round|int)*0.75)|int*1024 }}MB"
 
 - name: Restart postgresql
   service: name=postgresql state=restarted
-  when: pgconf.changed or pgconf.changed
+  when: pgconf.changed or perfconf.changed
